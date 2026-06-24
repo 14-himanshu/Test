@@ -1,0 +1,67 @@
+name: Badge Farmer Automation
+
+on:
+  schedule:
+    # Runs at 04:30 UTC every day, which is 10:00 AM IST
+    - cron: '30 4 * * *'
+  workflow_dispatch: # Allows you to manually click "Run workflow" in GitHub if you want
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  farm-badges:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Farm PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 30% chance to completely skip the day to look like a human taking a break
+          if [ $((RANDOM % 100)) -lt 30 ]; then
+            echo "Taking a day off! Skipping today's automated PRs."
+            exit 0
+          fi
+
+          # Decide how many PRs to do today (between 1 and 4)
+          TODAYS_PRS=$(( ( RANDOM % 4 ) + 1 ))
+          echo "Running $TODAYS_PRS PR(s) today."
+
+          # Setup git with your private GitHub noreply email
+          git config --global user.email "185378015+14-himanshu@users.noreply.github.com"
+          git config --global user.name "14-himanshu"
+
+          for ((i=1; i<=TODAYS_PRS; i++))
+          do
+            BRANCH_NAME="pr-shark-$(date +%s)-$i"
+            git checkout -b $BRANCH_NAME
+            
+            echo "Automated commit $i at $(date)" >> badge_tracker.txt
+            git add badge_tracker.txt
+            
+            # Commit with Co-authored-by trailer for Pair Extraordinaire
+            git commit -m "Automated PR $i for Badges
+            
+          Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+            
+            git push origin $BRANCH_NAME
+            
+            # Create and instantly merge the PR to earn Pull Shark, Quickdraw, and YOLO
+            gh pr create --title "Automated PR $i" --body "Earning the Pull Shark & Pair Extraordinaire badges"
+            gh pr merge --merge --delete-branch
+            
+            git checkout main
+            git pull origin main
+            
+            # Sleep a bit between PRs to ensure GitHub registers them as distinct actions safely
+            if [ $i -lt $TODAYS_PRS ]; then
+              SLEEP_TIME=$(( ( RANDOM % 50 ) + 10 ))
+              echo "Sleeping for $SLEEP_TIME seconds..."
+              sleep $SLEEP_TIME
+            fi
+          done
+          echo "All PRs for today finished!"
