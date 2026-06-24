@@ -2,9 +2,9 @@ name: Badge Farmer Automation
 
 on:
   schedule:
-    # Runs at 04:30 UTC every day, which is 10:00 AM IST
+    # Triggers at 10:00 AM IST daily
     - cron: '30 4 * * *'
-  workflow_dispatch: # Allows you to manually click "Run workflow" in GitHub if you want
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,31 +27,48 @@ jobs:
             exit 0
           fi
 
-          # Decide how many PRs to do today (between 1 and 4)
-          TODAYS_PRS=$(( ( RANDOM % 4 ) + 1 ))
+          # Decide how many PRs to do today (strict cap: between 1 and 5)
+          TODAYS_PRS=$(( ( RANDOM % 5 ) + 1 ))
           echo "Running $TODAYS_PRS PR(s) today."
+
+          # TIME JITTER: Sleep for a random amount of time up to 3 hours (10800 seconds)
+          # We skip this if manually triggered so you don't have to wait 3 hours while testing
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            JITTER=$((RANDOM % 10800))
+            echo "Stealth Mode: Sleeping for $JITTER seconds to randomize execution time..."
+            sleep $JITTER
+          fi
 
           # Setup git with your private GitHub noreply email
           git config --global user.email "185378015+14-himanshu@users.noreply.github.com"
           git config --global user.name "14-himanshu"
 
+          # Arrays of generic "human" text to obfuscate the commits
+          BRANCH_PREFIXES=("patch" "update-docs" "fix-typo" "refactor" "chore" "config")
+          MESSAGES=("Update documentation" "Fix minor typo" "Refactor config settings" "Clean up whitespace" "Update dependencies" "Improve logging")
+
           for ((i=1; i<=TODAYS_PRS; i++))
           do
-            BRANCH_NAME="pr-shark-$(date +%s)-$i"
+            # Pick a random branch name prefix and commit message
+            PREFIX=${BRANCH_PREFIXES[$RANDOM % ${#BRANCH_PREFIXES[@]}]}
+            MSG=${MESSAGES[$RANDOM % ${#MESSAGES[@]}]}
+            
+            BRANCH_NAME="$PREFIX-$(date +%s)-$i"
             git checkout -b $BRANCH_NAME
             
-            echo "Automated commit $i at $(date)" >> badge_tracker.txt
-            git add badge_tracker.txt
+            # Use a generic file name and content
+            echo "Activity logged at $(date +%s)" >> activity.log
+            git add activity.log
             
             # Commit with Co-authored-by trailer for Pair Extraordinaire
-            git commit -m "Automated PR $i for Badges
+            git commit -m "$MSG
             
           Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
             
             git push origin $BRANCH_NAME
             
-            # Create and instantly merge the PR to earn Pull Shark, Quickdraw, and YOLO
-            gh pr create --title "Automated PR $i" --body "Earning the Pull Shark & Pair Extraordinaire badges"
+            # Create and instantly merge the PR with a generic title
+            gh pr create --title "$MSG" --body "Routine maintenance and minor updates."
             gh pr merge --merge --delete-branch
             
             git checkout main
@@ -59,8 +76,8 @@ jobs:
             
             # Sleep a bit between PRs to ensure GitHub registers them as distinct actions safely
             if [ $i -lt $TODAYS_PRS ]; then
-              SLEEP_TIME=$(( ( RANDOM % 50 ) + 10 ))
-              echo "Sleeping for $SLEEP_TIME seconds..."
+              SLEEP_TIME=$(( ( RANDOM % 300 ) + 60 ))
+              echo "Sleeping for $SLEEP_TIME seconds before next PR..."
               sleep $SLEEP_TIME
             fi
           done
