@@ -21,14 +21,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 30% chance to completely skip the day to look like a human taking a break
+          # 30% chance to make only 1 contribution to look like a human taking a break
           if [ $((RANDOM % 100)) -lt 30 ]; then
-            echo "Taking a day off! Skipping today's automated PRs."
-            exit 0
+            echo "Taking a light day! Making only 1 automated PR today."
+            TODAYS_PRS=1
+          else
+            # Decide how many PRs to do today (strict cap: between 1 and 5)
+            TODAYS_PRS=$(( ( RANDOM % 5 ) + 1 ))
           fi
-
-          # Decide how many PRs to do today (strict cap: between 1 and 5)
-          TODAYS_PRS=$(( ( RANDOM % 5 ) + 1 ))
           echo "Running $TODAYS_PRS PR(s) today."
 
           # TIME JITTER: Sleep for a random amount of time up to 3 hours (10800 seconds)
