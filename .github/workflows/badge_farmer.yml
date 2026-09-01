@@ -68,8 +68,19 @@ jobs:
             git push origin $BRANCH_NAME
             
             # Create and instantly merge the PR with a generic title
-            gh pr create --title "$MSG" --body "Routine maintenance and minor updates."
-            gh pr merge --merge --delete-branch
+            PR_URL=$(gh pr create --title "$MSG" --body "Routine maintenance and minor updates.")
+            for attempt in 1 2 3
+            do
+              if gh pr merge "$PR_URL" --merge --delete-branch; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo "PR merge failed after 3 attempts."
+                exit 1
+              fi
+              echo "Merge attempt $attempt failed, retrying..."
+              sleep 5
+            done
             
             git checkout main
             git pull origin main
